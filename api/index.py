@@ -35,7 +35,7 @@ def percentile(data, percent):
     d1 = data_sorted[c] * (k - f)
     return d0 + d1
 
-@app.post("/api/latency")
+@app.post("/")
 async def latency_metrics(payload: dict):
     regions = payload.get("regions", [])
     threshold = payload.get("threshold_ms", 180)
