@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from statistics import mean
 import math
@@ -7,14 +8,16 @@ import os
 
 app = FastAPI()
 
-
+# ✅ Enable CORS properly
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,  
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],      # Allow all origins
+    allow_credentials=False,  # Must be False when using "*"
+    allow_methods=["*"],      # Allow all HTTP methods
+    allow_headers=["*"],      # Allow all headers
 )
+
+# ✅ Load telemetry data
 BASE_DIR = os.path.dirname(__file__)
 json_path = os.path.join(BASE_DIR, "q-vercel-latency.json")
 
@@ -31,14 +34,21 @@ def percentile(data, percent):
     c = math.ceil(k)
     if f == c:
         return data_sorted[int(k)]
-    d0 = data_sorted[f] * (c - k)
-    d1 = data_sorted[c] * (k - f)
-    return d0 + d1
+    return data_sorted[f] * (c - k) + data_sorted[c] * (k - f)
+
+# ✅ Explicit OPTIONS handler for CORS preflight requests
+@app.options("/")
+async def preflight_handler(request: Request):
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+    }
+    return JSONResponse(content={}, headers=headers)
 
 @app.get("/")
-def nothing():
-    return ""
-
+def health_check():
+    return {"status": "ok"}
 
 @app.post("/")
 async def latency_metrics(payload: dict):
@@ -47,7 +57,6 @@ async def latency_metrics(payload: dict):
     result = {}
 
     for region in regions:
-        # Filter records by region
         region_data = [r for r in telemetry if r["region"] == region]
 
         if not region_data:
@@ -70,7 +79,10 @@ async def latency_metrics(payload: dict):
             "breaches": breaches
         }
 
-    return result
+    # ✅ Add explicit CORS header to POST response
+    headers = {"Access-Control-Allow-Origin": "*"}
+    return JSONResponse(content=result, headers=headers)
+
 
 
 
