@@ -1,8 +1,8 @@
-# api/index.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from statistics import mean
+import math
 import json
-import numpy as np
 
 app = FastAPI()
 
@@ -17,6 +17,20 @@ app.add_middleware(
 # Load telemetry JSON once at startup
 with open("telemetry.json") as f:
     telemetry = json.load(f)
+
+def percentile(data, percent):
+    """Compute the given percentile of a list of numbers."""
+    if not data:
+        return None
+    data_sorted = sorted(data)
+    k = (len(data_sorted)-1) * (percent/100)
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return data_sorted[int(k)]
+    d0 = data_sorted[f] * (c - k)
+    d1 = data_sorted[c] * (k - f)
+    return d0 + d1
 
 @app.post("/api/latency")
 async def latency_metrics(payload: dict):
@@ -37,18 +51,19 @@ async def latency_metrics(payload: dict):
             }
             continue
 
-        latencies = np.array([r["latency_ms"] for r in region_data])
-        uptimes = np.array([r["uptime_pct"] for r in region_data])
-        breaches = int(np.sum(latencies > threshold))
+        latencies = [r["latency_ms"] for r in region_data]
+        uptimes = [r["uptime_pct"] for r in region_data]
+        breaches = sum(1 for l in latencies if l > threshold)
 
         result[region] = {
-            "avg_latency": float(np.mean(latencies)),
-            "p95_latency": float(np.percentile(latencies, 95)),
-            "avg_uptime": float(np.mean(uptimes)),
+            "avg_latency": mean(latencies),
+            "p95_latency": percentile(latencies, 95),
+            "avg_uptime": mean(uptimes),
             "breaches": breaches
         }
 
     return result
+
 
 
 
