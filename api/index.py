@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from statistics import mean
 import math
 import json
+import os
 
 app = FastAPI()
 
