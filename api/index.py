@@ -1,11 +1,21 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from statistics import mean
 import math
 import json
 import os
 
 app = FastAPI()
+
+# Add CORS middleware - THIS IS THE KEY FIX
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load telemetry JSON from same folder
 BASE_DIR = os.path.dirname(__file__)
@@ -24,28 +34,12 @@ def percentile(data, percent):
         return data_sorted[int(k)]
     return data_sorted[f] * (c - k) + data_sorted[c] * (k - f)
 
-# Global middleware to add CORS headers and handle OPTIONS
-@app.middleware("http")
-async def add_cors_headers(request: Request, call_next):
-    if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            },
-        )
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    return response
-
 @app.post("/")
 async def latency_metrics(payload: dict):
     regions = payload.get("regions", [])
     threshold = payload.get("threshold_ms", 180)
+    
     result = {}
-
     for region in regions:
         region_data = [r for r in telemetry if r["region"] == region]
         if not region_data:
@@ -56,18 +50,19 @@ async def latency_metrics(payload: dict):
                 "breaches": 0,
             }
             continue
-
+        
         latencies = [r["latency_ms"] for r in region_data]
         uptimes = [r["uptime_pct"] for r in region_data]
         breaches = sum(1 for l in latencies if l > threshold)
+        
         result[region] = {
             "avg_latency": mean(latencies),
             "p95_latency": percentile(latencies, 95),
             "avg_uptime": mean(uptimes),
             "breaches": breaches,
         }
-
-    return JSONResponse(content=result, headers={"Access-Control-Allow-Origin": "*"})
+    
+    return result
 
 
 
