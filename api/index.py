@@ -14,8 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load telemetry JSON once at startup
-with open("q-vercel-latency.json") as f:
+BASE_DIR = os.path.dirname(__file__)
+json_path = os.path.join(BASE_DIR, "q-vercel-latency.json")
+
+with open(json_path) as f:
     telemetry = json.load(f)
 
 def percentile(data, percent):
